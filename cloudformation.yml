@@ -326,7 +326,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       AccessControl: 'Private'
-      BucketName: 'api-build-artifacts'
+      BucketName: 'serverless-api-cicd-build-artifacts'
 
   #
   # Code Build IAM Role
@@ -465,6 +465,13 @@ Resources:
               RoleArn: !GetAtt CloudFormationRole.Arn
               StackName: !Ref AWS::StackName
               TemplatePath: SourceOutput::cloudformation.yml
+              ParameterOverrides: !Sub |
+                {
+                  "GitHubOwner": "${GitHubOwner}",
+                  "GitHubRepo": "${GitHubRepo}",
+                  "GitHubBranch": "${GitHubBranch}",
+                  "GitHubToken": "${GitHubToken}"
+                }
             InputArtifacts:
               - Name: SourceOutput
       - Name: Build
