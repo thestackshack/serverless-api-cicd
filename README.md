@@ -28,7 +28,7 @@ aws cloudformation create-stack \
 --template-body file:///Users/findleyr/Documents/code/thestackshack/serverless-api-cicd/cloudformation.yml \
 --tags=Key=app,Value=serverless-stack \
 --capabilities CAPABILITY_IAM \
---parameters file:///Users/findleyr/Documents/code/thestackshack/serverless-api-cicd/params.json \
+--parameters file:///Users/findleyr/Documents/code/thestackshack/serverless-api-cicd/.params.json \
 --profile bluefin
 
 ### Pipeline to update stack and deploy lambda
