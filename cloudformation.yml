@@ -323,7 +323,7 @@ Resources:
   #
   ArtifactsBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
+    DeletionPolicy: Retain
     Properties:
       AccessControl: 'Private'
       BucketName: 'serverless-api-cicd-build-artifacts'
