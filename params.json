@@ -1,0 +1,18 @@
+[
+  {
+    "ParameterKey": "GitHubOwner",
+    "ParameterValue": "rgfindl"
+  },
+  {
+    "ParameterKey": "GitHubRepo",
+    "ParameterValue": "thestackshack/serverless-api-cicd"
+  },
+  {
+    "ParameterKey": "GitHubBranch",
+    "ParameterValue": "master"
+  },
+  {
+    "ParameterKey": "GitHubToken",
+    "ParameterValue": "05befe9e53b3b5acb74a9a84d4382009595b8336"
+  }
+]

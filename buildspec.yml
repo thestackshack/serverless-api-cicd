@@ -1,0 +1,23 @@
+version: 0.2
+
+# aws/codebuild/eb-nodejs-6.10.0-amazonlinux-64:4.0.0
+phases:
+  install:
+    commands:
+      - echo Install completed on `date`
+  pre_build:
+    commands:
+      - echo Installing source NPM dependencies...
+      - npm install
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Testing the code
+      - npm test
+  post_build:
+    commands:
+      - echo Build completed on `date`
+artifacts:
+  files:
+    - '**/*'
+  type: zip

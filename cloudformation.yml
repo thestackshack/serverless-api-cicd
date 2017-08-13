@@ -1,0 +1,508 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  GitHubOwner:
+    Type: String
+    Description: GitHub repository owner
+  GitHubRepo:
+    Type: String
+    Default: aws-codepipeline-nested-stack
+    Description: GitHub repository name
+  GitHubBranch:
+    Type: String
+    Default: master
+    Description: GitHub repository branch
+  GitHubToken:
+    Type: String
+    Description: GitHub repository OAuth token
+Resources:
+  #
+  # Role that our Lambda will assume to provide access to other AWS resources
+  #
+  IamRoleLambdaExecution:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+
+  #
+  # Create a Policy and attach it to our Lambda Role.
+  #
+  IamPolicyLambdaExecution:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: IamPolicyLambdaExecution
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          Resource: arn:aws:logs:us-east-1:*:*
+        - Effect: Allow
+          Action:
+          - logs:PutLogEvents
+          Resource: arn:aws:logs:us-east-1:*:*
+      Roles:
+      - Ref: IamRoleLambdaExecution
+
+  #
+  # Our Lambda function.  Basic code has been added.  You will replace the code later via your Github repo.
+  #
+  APIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - IamRoleLambdaExecution
+          - Arn
+      Code:
+        ZipFile: |
+          'use strict';
+
+          exports.handler = (event, context, callback) => {
+            const response = {
+              statusCode: 200,
+              body: JSON.stringify({
+                message: `Hello, the current time is ${new Date().toTimeString()}.`,
+                event: event
+              })
+            };
+
+            callback(null, response);
+          };
+      Runtime: nodejs6.10
+
+  #
+  # Create two aliases for our Lambda function.  DEV and PROD.  These pointers may point to different versions of the
+  # function.  This allows us to try out new code in our dev environment before promoting it to prod.
+  #
+  APIFunctionDevAlias:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName:
+        Ref: APIFunction
+      FunctionVersion: '$LATEST'
+      Name: DEV
+  APIFunctionProdAlias:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName:
+        Ref: APIFunction
+      FunctionVersion: '$LATEST'
+      Name: PROD
+
+  #
+  # We need to give API Gateway permission to invoke our Lambda function and aliases.
+  #
+  LambdaDevPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Ref: APIFunctionDevAlias
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: ApiGatewayRestApi
+            - '/*/*'
+  LambdaProdPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Ref: APIFunctionProdAlias
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:execute-api:'
+            - Ref: AWS::Region
+            - ':'
+            - Ref: AWS::AccountId
+            - ':'
+            - Ref: ApiGatewayRestApi
+            - '/*/*'
+
+  #
+  # Create the API Gateway
+  #
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ApiGatewayRestApi
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+          - ApiGatewayRestApi
+          - RootResourceId
+      PathPart: api
+      RestApiId:
+        Ref: ApiGatewayRestApi
+  ApiGatewayResourceProxy:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: ApiGatewayResource
+      PathPart: '{proxy+}'
+      RestApiId:
+        Ref: ApiGatewayRestApi
+
+  #
+  # Create a role that gives API Gateway permission to write to CloudWatch Logs.
+  #
+  ApiGatewayCloudWatchLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: ApiGatewayLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
+            - logs:PutLogEvents
+            - logs:GetLogEvents
+            - logs:FilterLogEvents
+            Resource: "*"
+
+  #
+  # Attach the role to API Gateway
+  #
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn:
+        Fn::GetAtt:
+          - ApiGatewayCloudWatchLogsRole
+          - Arn
+
+  #
+  # Create an API Gateway stage that invokes either the DEV or PROD Lambda alias.  This allows us to have different
+  # api endpoints, one for dev and one for prod.
+  #
+  ApiGatewayStageDEV:
+    DependsOn:
+    - ApiGatewayAccount
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ApiGatewayDeployment
+      MethodSettings:
+      - DataTraceEnabled: true
+        HttpMethod: "*"
+        LoggingLevel: INFO
+        ResourcePath: "/*"
+      RestApiId:
+        Ref: ApiGatewayRestApi
+      StageName: dev
+      Variables:
+        LambdaAlias: DEV
+  ApiGatewayStagePROD:
+    DependsOn:
+    - ApiGatewayAccount
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ApiGatewayDeployment
+      MethodSettings:
+      - DataTraceEnabled: true
+        HttpMethod: "*"
+        LoggingLevel: INFO
+        ResourcePath: "/*"
+      RestApiId:
+        Ref: ApiGatewayRestApi
+      StageName: prod
+      Variables:
+        LambdaAlias: PROD
+
+  #
+  # Create a GET and POST method that each invoke our Lambda
+  #
+  ApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: ANY
+      RequestParameters: {}
+      ResourceId:
+        Ref: ApiGatewayResource
+      RestApiId:
+        Ref: ApiGatewayRestApi
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - ':lambda:path/2015-03-31/functions/'
+              - Fn::GetAtt:
+                - APIFunction
+                - Arn
+              - ':${stageVariables.LambdaAlias}'
+              - '/invocations'
+      MethodResponses: []
+  ApiGatewayMethoProxy:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: ANY
+      RequestParameters: {}
+      ResourceId:
+        Ref: ApiGatewayResourceProxy
+      RestApiId:
+        Ref: ApiGatewayRestApi
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ''
+            - - 'arn:aws:apigateway:'
+              - Ref: AWS::Region
+              - ':lambda:path/2015-03-31/functions/'
+              - Fn::GetAtt:
+                - APIFunction
+                - Arn
+              - ':${stageVariables.LambdaAlias}'
+              - '/invocations'
+      MethodResponses: []
+
+  #
+  # Create the API Gateway deployment which uses both the GET and POST methods
+  #
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId:
+        Ref: ApiGatewayRestApi
+      StageName: DummyStage
+    DependsOn:
+    - ApiGatewayMethod
+    - ApiGatewayMethoProxy
+
+
+  #
+  # CI/CD CodePipeline
+  #
+
+  #
+  # Artifact S3 bucket
+  #
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: 'Private'
+      BucketName: 'api-build-artifacts'
+
+  #
+  # Code Build IAM Role
+  #
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+      Policies:
+        - PolicyName: ServiceRole
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: CloudWatchWriteLogsPolicy
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+              - Sid: S3GetObjectPolicy
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: '*'
+              - Sid: S3PutObjectPolicy
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: '*'
+
+  #
+  # Code Pipeline IAM Role
+  #
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  #
+  # CloudFormation IAM Role
+  #
+  CloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  #
+  # Code Build project
+  #
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CloudFormationRole
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/eb-nodejs-6.10.0-amazonlinux-64:4.0.0
+        Type: LINUX_CONTAINER
+      Name: 'serverless-api-cicd'
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Source:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 5 # must be between 5 minutes and 8 hours
+
+  #
+  # Code Pipeline
+  #
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactsBucket
+      Name: 'serverless-api-cicd'
+      RestartExecutionOnUpdate: true
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+      - Name: Source
+        Actions:
+        - Name: Source
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Version: 1
+            Provider: GitHub
+          Configuration:
+            Owner: !Ref GitHubOwner
+            Repo: !Ref GitHubRepo
+            Branch: !Ref GitHubBranch
+            OAuthToken: !Ref GitHubToken
+          OutputArtifacts:
+            - Name: SourceOutput
+          RunOrder: 1
+      - Name: StackDeploy
+        Actions:
+          - Name: CreateUpdateStack
+            ActionTypeId:
+              Category: Deploy
+              Owner: AWS
+              Provider: CloudFormation
+              Version: 1
+            Configuration:
+              ActionMode: CREATE_UPDATE
+              Capabilities: CAPABILITY_IAM
+              RoleArn: !GetAtt CloudFormationRole.Arn
+              StackName: !Ref AWS::StackName
+              TemplatePath: SourceOutput::cloudformation.yml
+            InputArtifacts:
+              - Name: SourceOutput
+      - Name: Build
+        Actions:
+          - Name: BuildAndTest
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: 1
+            Configuration:
+              ProjectName: !Ref CodeBuildProject
+            InputArtifacts:
+              - Name: SourceOutput
+            OutputArtifacts:
+              - Name: BuildOutput
+
+#
+# Return the API Gateway endpoints.
+#
+Outputs:
+  ServiceEndpointProd:
+    Description: URL of the PROD service endpoint
+    Value:
+      Fn::Join:
+        - ''
+        - - 'https://'
+          - Ref: ApiGatewayRestApi
+          - '.execute-api.'
+          - Ref: AWS::Region
+          - '.amazonaws.com/prod/api'
+  ServiceEndpointDev:
+    Description: URL of the DEV service endpoint
+    Value:
+      Fn::Join:
+        - ''
+        - - 'https://'
+          - Ref: ApiGatewayRestApi
+          - '.execute-api.'
+          - Ref: AWS::Region
+          - '.amazonaws.com/dev/api'
