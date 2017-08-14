@@ -600,7 +600,20 @@ Resources:
     Type: AWS::Lambda::Function
     DependsOn: CloudFormationRole
     Properties:
-      Handler: index.handler
+      Handler: deploy.deploy
+      Role:
+        Fn::GetAtt:
+          - IamRoleLambdaExecution
+          - Arn
+      Code:
+        S3Bucket: thestackshack
+        S3Key: serverless-api-cicd/deploy.js.zip
+      Runtime: nodejs6.10
+  ShowFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: CloudFormationRole
+    Properties:
+      Handler: deploy.show
       Role:
         Fn::GetAtt:
           - IamRoleLambdaExecution
@@ -771,3 +784,9 @@ Outputs:
           - '.execute-api.'
           - Ref: AWS::Region
           - '.amazonaws.com/dev/api'
+  DeployFunction:
+    Description: Deploy Lambda Function
+    Value: !Ref DeployFunction
+  ShowFunction:
+    Description: Show Lambda Function
+    Value: !Ref ShowFunction

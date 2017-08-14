@@ -4,16 +4,51 @@ var AWS = require('aws-sdk');
 var lambda = new AWS.Lambda({apiVersion: '2015-03-31'});
 var s3 = new AWS.S3();
 
-exports.handler = function(event, context, callback) {
+// Get the builds.json file.
+var getBuildsFile = function(bucket, branch, next) {
+    console.log('getBuildsFile');
+    var params = {
+        Bucket: bucket,
+        Key: branch+'/builds.json'
+    };
+    console.log(JSON.stringify(params));
+    s3.getObject(params, next);
+};
+
+var success = function(data) {
+    const response = {
+        success: true,
+        data: data
+    };
+    callback(null, response);
+};
+
+var failure = function(err) {
+    console.log(err);
+    const response = {
+        success: false,
+        err: err
+    };
+    callback(null, response);
+};
+
+exports.show = function(event, context, callback) {
+    getBuildsFile(bucket, branch, function(err, dataObj) {
+        if (err) return failure(err);
+        else return success(JSON.parse(dataObj.Body));
+    });
+};
+
+exports.deploy = function(event, context, callback) {
 
     // Create a new Lambda Version
     var updateFunctionCode = function(next) {
         console.log('updateFunctionCode');
         var params = {
-            FunctionName: '${APIFunction}', /* required */
+            FunctionName: event.lambda, /* required */
             DryRun: false,
             Publish: true,
-            S3Bucket: '${ArtifactsBucket}',
+            S3Bucket: event.artifactBucket,
             S3Key: event.branch+'/'+event.version
         };
         console.log(JSON.stringify(params));
@@ -24,7 +59,7 @@ exports.handler = function(event, context, callback) {
     var updateAlias = function(version, next) {
         console.log('updateAlias');
         var params = {
-            FunctionName: '${APIFunction}', /* required */
+            FunctionName: event.lambda, /* required */
             FunctionVersion: version,
             Name: event.branch === 'master' ? 'PROD' : 'DEV'
         };
@@ -36,7 +71,7 @@ exports.handler = function(event, context, callback) {
     var deleteOldVersions = function(next) {
         console.log('deleteOldVersions');
         var params = {
-            FunctionName: '${APIFunction}', /* required */
+            FunctionName: event.lambda, /* required */
             MaxItems: 10
         };
         console.log(JSON.stringify(params));
@@ -47,7 +82,7 @@ exports.handler = function(event, context, callback) {
                 versionsInUse.push(data.Aliases[i].FunctionVersion);
             }
             var params = {
-                FunctionName: '${APIFunction}', /* required */
+                FunctionName: event.lambda, /* required */
                 MaxItems: 10
             };
             lambda.listVersionsByFunction(params, function(err, data) {
@@ -58,7 +93,7 @@ exports.handler = function(event, context, callback) {
                         if (versionsInUse.indexOf(data.Versions[i].Version) === -1) {
                             console.log('deleteOldVersion');
                             var params = {
-                                FunctionName: '${APIFunction}', /* required */
+                                FunctionName: event.lambda, /* required */
                                 Qualifier: data.Versions[i].Version
                             };
                             console.log(JSON.stringify(params));
@@ -80,17 +115,6 @@ exports.handler = function(event, context, callback) {
     };
 
     // Update the builds.json history
-
-    // Get the builds.json file.
-    var getBuildsFile = function(bucket, branch, next) {
-        console.log('getBuildsFile');
-        var params = {
-            Bucket: bucket,
-            Key: branch+'/builds.json'
-        };
-        console.log(JSON.stringify(params));
-        s3.getObject(params, next);
-    };
 
     // Put the builds.json file.
     var putBuildsFile = function(bucket, branch, data, next) {
@@ -125,22 +149,6 @@ exports.handler = function(event, context, callback) {
         });
     };
 
-    var success = function() {
-        const response = {
-            success: true
-        };
-        callback(null, response);
-    };
-
-    var failure = function(err) {
-        console.log(err);
-        const response = {
-            success: false,
-            err: err
-        };
-        callback(null, response);
-    };
-
     updateFunctionCode(function(err, data) {
         if (err) return failure(err);
 
@@ -150,9 +158,9 @@ exports.handler = function(event, context, callback) {
             deleteOldVersions(function(err) {
                 if (err) return failure(err);
 
-                updateBuildsFile('${ArtifactsBucket}', event.branch, event.version, function(err) {
+                updateBuildsFile(event.artifactBucket, event.branch, event.version, function(err) {
                     if (err) return failure(err);
-                    success();
+                    success(null);
                 });
             });
         });
