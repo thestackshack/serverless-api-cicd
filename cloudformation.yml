@@ -528,7 +528,6 @@ Resources:
               - Name: BuildOutput
             Configuration:
               FunctionName: !Ref PackageFunction
-              UserParameters: !Ref BuildOutput
 
 #
 # Return the API Gateway endpoints.
