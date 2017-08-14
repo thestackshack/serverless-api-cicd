@@ -12,6 +12,9 @@ exports.handler = function(event, context) {
     // Retrieve the Job ID from the Lambda action
     var jobId = event["CodePipeline.job"].id;
 
+    var bucket = event["CodePipeline.job"].data.inputArtifacts[0].location.s3Location.bucketName;
+    var key = event["CodePipeline.job"].data.inputArtifacts[0].location.s3Location.objectKey;
+
     // Notify AWS CodePipeline of a successful job
     var putJobSuccess = function(message) {
         var params = {
