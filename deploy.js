@@ -13,8 +13,7 @@ exports.handler = function(event, context, callback) {
             DryRun: false,
             Publish: true,
             S3Bucket: '${ArtifactsBucket}',
-            S3Key: event.branch+'/'+event.version,
-            S3ObjectVersion: '1'
+            S3Key: event.branch+'/'+event.version
         };
         console.log(JSON.stringify(params));
         lambda.updateFunctionCode(params, next);
@@ -41,8 +40,7 @@ exports.handler = function(event, context, callback) {
         };
         console.log(JSON.stringify(params));
         lambda.listAliases(params, function(err, data) {
-            if (err) console.log(err, err.stack); // an error occurred
-            else     console.log(data);           // successful response
+            if (err) return next(err); // an error occurred
             var versionsInUse = [];
             for (var i = 0 ; i < data.Aliases.length ; i++) {
                 versionsInUse.push(data.Aliases[i].FunctionVersion);
@@ -52,8 +50,7 @@ exports.handler = function(event, context, callback) {
                 MaxItems: 10
             };
             lambda.listVersionsByFunction(params, function(err, data) {
-                if (err) console.log(err, err.stack); // an error occurred
-                else     console.log(data);           // successful response
+                if (err) return next(err); // an error occurred
                 var deleteErr = null;
                 var loopDelete = function(i) {
                     if( i < data.Versions.length ) {
@@ -65,8 +62,7 @@ exports.handler = function(event, context, callback) {
                             };
                             console.log(JSON.stringify(params));
                             lambda.deleteFunction(params, function(err, data) {
-                                if (err) console.log(err, err.stack); // an error occurred
-                                else     console.log(data);           // successful response
+                                if (err) return next(err); // an error occurred
                                 deleteErr = err;
                                 if (!err)
                                     loopDelete(i+1);
@@ -84,24 +80,79 @@ exports.handler = function(event, context, callback) {
 
     // Update the builds.json history
 
+    // Get the builds.json file.
+    var getBuildsFile = function(bucket, branch, next) {
+        console.log('getBuildsFile');
+        var params = {
+            Bucket: bucket,
+            Key: branch+'/builds.json'
+        };
+        console.log(JSON.stringify(params));
+        s3.getObject(params, next);
+    };
 
+    // Put the builds.json file.
+    var putBuildsFile = function(bucket, branch, data, next) {
+        console.log('putBuildsFile');
+        var params = {
+            Body: JSON.stringify(data),
+            Bucket: bucket,
+            Key: branch+'/builds.json',
+            ContentType: 'application/json'
+        };
+        console.log(JSON.stringify(params));
+        s3.putObject(params, next);
+    };
+
+    var updateBuildsFile = function(bucket, branch, version, next) {
+        getBuildsFile(bucket, branch, function(err, dataObj) {
+            if (err) return next(err);
+            else {
+                var data = JSON.parse(dataObj.Body);
+                if (!data.history) {
+                    data.history = [];
+                }
+                data.history.push({
+                    version: version,
+                    date: new Date()
+                });
+                data.current_version = version;
+                putBuildsFile(bucket, branch, data, function(err, results) {
+                    next(err);
+                });
+            }
+        });
+    };
+
+    var success = function() {
+        const response = {
+            success: true
+        };
+        callback(null, response);
+    };
+
+    var failure = function(err) {
+        console.log(err);
+        const response = {
+            success: false,
+            err: err
+        };
+        callback(null, response);
+    };
 
     updateFunctionCode(function(err, data) {
-        if (err) console.log(err, err.stack); // an error occurred
-        else     console.log(data);           // successful response
+        if (err) return failure(err);
 
         updateAlias(data.Version, function(err, data) {
-            if (err) console.log(err, err.stack); // an error occurred
-            else     console.log(data);           // successful response
+            if (err) return failure(err);
 
             deleteOldVersions(function(err) {
-                if (err) console.log(err, err.stack); // an error occurred
+                if (err) return failure(err);
 
-                const response = {
-                    status: 'complete'
-                };
-
-                callback(null, response);
+                updateBuildsFile(${ArtifactsBucket}, event.branch, event.version, function(err) {
+                    if (err) return failure(err);
+                    success();
+                });
             });
         });
     });
