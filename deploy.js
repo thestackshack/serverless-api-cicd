@@ -15,7 +15,7 @@ var getBuildsFile = function(bucket, branch, next) {
     s3.getObject(params, next);
 };
 
-var success = function(data) {
+var success = function(data, callback) {
     const response = {
         success: true,
         data: data
@@ -23,7 +23,7 @@ var success = function(data) {
     callback(null, response);
 };
 
-var failure = function(err) {
+var failure = function(err, callback) {
     console.log(err);
     const response = {
         success: false,
@@ -34,8 +34,8 @@ var failure = function(err) {
 
 exports.show = function(event, context, callback) {
     getBuildsFile(event.artifactBucket, evnet.branch, function(err, dataObj) {
-        if (err) return failure(err);
-        else return success(JSON.parse(dataObj.Body));
+        if (err) return failure(err, callback);
+        else return success(JSON.parse(dataObj.Body), callback);
     });
 };
 
@@ -150,17 +150,17 @@ exports.deploy = function(event, context, callback) {
     };
 
     updateFunctionCode(function(err, data) {
-        if (err) return failure(err);
+        if (err) return failure(err, callback);
 
         updateAlias(data.Version, function(err, data) {
-            if (err) return failure(err);
+            if (err) return failure(err, callback);
 
             deleteOldVersions(function(err) {
-                if (err) return failure(err);
+                if (err) return failure(err, callback);
 
                 updateBuildsFile(event.artifactBucket, event.branch, event.version, function(err) {
-                    if (err) return failure(err);
-                    success(null);
+                    if (err) return failure(err, callback);
+                    success(null, callback);
                 });
             });
         });

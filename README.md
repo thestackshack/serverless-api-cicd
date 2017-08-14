@@ -34,3 +34,10 @@ aws cloudformation create-stack \
 ### Pipeline to update stack and deploy lambda
 https://github.com/milancermak/lambda-pipeline/tree/master/infrastructure
 https://github.com/wjordan/aws-codepipeline-nested-stack/blob/master/cfn-template.yml
+
+## CLI
+- Collect params.
+- Zip and upload deploy.js
+- Execute CF create stack
+- Deploy...
+- Show...
