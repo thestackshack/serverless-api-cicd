@@ -2,6 +2,7 @@
 
 var AWS = require('aws-sdk');
 var lambda = new AWS.Lambda({apiVersion: '2015-03-31'});
+var s3 = new AWS.S3();
 
 exports.handler = function(event, context, callback) {
 
@@ -149,7 +150,7 @@ exports.handler = function(event, context, callback) {
             deleteOldVersions(function(err) {
                 if (err) return failure(err);
 
-                updateBuildsFile(${ArtifactsBucket}, event.branch, event.version, function(err) {
+                updateBuildsFile('${ArtifactsBucket}', event.branch, event.version, function(err) {
                     if (err) return failure(err);
                     success();
                 });
