@@ -88,6 +88,9 @@ Resources:
           Action:
             - lambda:UpdateFunctionCode
             - lambda:UpdateAlias
+            - lambda:ListAliases
+            - lambda:ListVersionsByFunction
+            - lambda:DeleteFunction
           Resource: '*'
       Roles:
       - Ref: IamRoleLambdaExecution
