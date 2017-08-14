@@ -15,11 +15,31 @@ Parameters:
     Type: String
     Description: GitHub repository OAuth token
 Resources:
+
+  #
+  # CloudFormation IAM Role
+  #
+  CloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
   #
   # Role that our Lambda will assume to provide access to other AWS resources
   #
   IamRoleLambdaExecution:
     Type: AWS::IAM::Role
+    DependsOn: CloudFormationRole
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -37,6 +57,7 @@ Resources:
   #
   IamPolicyLambdaExecution:
     Type: AWS::IAM::Policy
+    DependsOn: CloudFormationRole
     Properties:
       PolicyName: IamPolicyLambdaExecution
       PolicyDocument:
@@ -71,6 +92,7 @@ Resources:
   #
   APIFunction:
     Type: AWS::Lambda::Function
+    DependsOn: CloudFormationRole
     Properties:
       Handler: index.handler
       Role:
@@ -100,6 +122,7 @@ Resources:
   #
   APIFunctionDevAlias:
     Type: AWS::Lambda::Alias
+    DependsOn: CloudFormationRole
     Properties:
       FunctionName:
         Ref: APIFunction
@@ -107,6 +130,7 @@ Resources:
       Name: DEV
   APIFunctionProdAlias:
     Type: AWS::Lambda::Alias
+    DependsOn: CloudFormationRole
     Properties:
       FunctionName:
         Ref: APIFunction
@@ -118,6 +142,7 @@ Resources:
   #
   LambdaDevPermission:
     Type: AWS::Lambda::Permission
+    DependsOn: CloudFormationRole
     Properties:
       Action: lambda:invokeFunction
       FunctionName:
@@ -135,6 +160,7 @@ Resources:
             - '/*/*'
   LambdaProdPermission:
     Type: AWS::Lambda::Permission
+    DependsOn: CloudFormationRole
     Properties:
       Action: lambda:invokeFunction
       FunctionName:
@@ -156,10 +182,12 @@ Resources:
   #
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
+    DependsOn: CloudFormationRole
     Properties:
       Name: ApiGatewayRestApi
   ApiGatewayResource:
     Type: AWS::ApiGateway::Resource
+    DependsOn: CloudFormationRole
     Properties:
       ParentId:
         Fn::GetAtt:
@@ -170,6 +198,7 @@ Resources:
         Ref: ApiGatewayRestApi
   ApiGatewayResourceProxy:
     Type: AWS::ApiGateway::Resource
+    DependsOn: CloudFormationRole
     Properties:
       ParentId:
         Ref: ApiGatewayResource
@@ -182,6 +211,7 @@ Resources:
   #
   ApiGatewayCloudWatchLogsRole:
     Type: AWS::IAM::Role
+    DependsOn: CloudFormationRole
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -213,6 +243,7 @@ Resources:
   #
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
+    DependsOn: CloudFormationRole
     Properties:
       CloudWatchRoleArn:
         Fn::GetAtt:
@@ -226,6 +257,7 @@ Resources:
   ApiGatewayStageDEV:
     DependsOn:
     - ApiGatewayAccount
+    - CloudFormationRole
     Type: AWS::ApiGateway::Stage
     Properties:
       DeploymentId:
@@ -243,6 +275,7 @@ Resources:
   ApiGatewayStagePROD:
     DependsOn:
     - ApiGatewayAccount
+    - CloudFormationRole
     Type: AWS::ApiGateway::Stage
     Properties:
       DeploymentId:
@@ -263,6 +296,7 @@ Resources:
   #
   ApiGatewayMethod:
     Type: AWS::ApiGateway::Method
+    DependsOn: CloudFormationRole
     Properties:
       HttpMethod: ANY
       RequestParameters: {}
@@ -288,6 +322,7 @@ Resources:
       MethodResponses: []
   ApiGatewayMethoProxy:
     Type: AWS::ApiGateway::Method
+    DependsOn: CloudFormationRole
     Properties:
       HttpMethod: ANY
       RequestParameters: {}
@@ -317,6 +352,7 @@ Resources:
   #
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
+    DependsOn: CloudFormationRole
     Properties:
       RestApiId:
         Ref: ApiGatewayRestApi
@@ -335,7 +371,8 @@ Resources:
   #
   ArtifactsBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
+    DependsOn: CloudFormationRole
     Properties:
       AccessControl: 'Private'
       BucketName: 'serverless-api-cicd-build-artifacts'
@@ -345,6 +382,7 @@ Resources:
   #
   CodeBuildRole:
     Type: AWS::IAM::Role
+    DependsOn: CloudFormationRole
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -384,6 +422,7 @@ Resources:
   #
   CodePipelineRole:
     Type: AWS::IAM::Role
+    DependsOn: CloudFormationRole
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -394,24 +433,6 @@ Resources:
             Principal:
               Service:
                 - codepipeline.amazonaws.com
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AdministratorAccess
-
-  #
-  # CloudFormation IAM Role
-  #
-  CloudFormationRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - sts:AssumeRole
-            Principal:
-              Service:
-                - cloudformation.amazonaws.com
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
 
@@ -439,6 +460,7 @@ Resources:
   #
   PackageFunction:
     Type: AWS::Lambda::Function
+    DependsOn: CloudFormationRole
     Properties:
       Handler: index.handler
       Role:
@@ -498,13 +520,13 @@ Resources:
   #
   # Code Pipeline 'master'
   #
-  CodePipeline:
+  CodePipelineMaster:
     Type: AWS::CodePipeline::Pipeline
+    DependsOn: CloudFormationRole
     Properties:
       ArtifactStore:
         Type: S3
         Location: !Ref ArtifactsBucket
-      Name: 'serverless-api-cicd-master'
       RestartExecutionOnUpdate: true
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
@@ -578,13 +600,13 @@ Resources:
   #
   # Code Pipeline 'develop'
   #
-  CodePipeline:
+  CodePipelineDevelop:
     Type: AWS::CodePipeline::Pipeline
+    DependsOn: CloudFormationRole
     Properties:
       ArtifactStore:
         Type: S3
         Location: !Ref ArtifactsBucket
-      Name: 'serverless-api-cicd-develop'
       RestartExecutionOnUpdate: true
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
