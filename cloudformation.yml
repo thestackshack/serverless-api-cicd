@@ -525,10 +525,8 @@ Resources:
             Provider: Lambda
             Version: 1
           Configuration:
-            FunctionName:
-              !Ref PackageFunction
-            UserParameters:
-              !Ref BuildOutput
+            FunctionName: !Ref PackageFunction
+            UserParameters: !Ref BuildOutput
 
 #
 # Return the API Gateway endpoints.
