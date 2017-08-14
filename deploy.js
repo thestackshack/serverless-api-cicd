@@ -33,7 +33,7 @@ var failure = function(err) {
 };
 
 exports.show = function(event, context, callback) {
-    getBuildsFile(bucket, branch, function(err, dataObj) {
+    getBuildsFile(event.artifactBucket, evnet.branch, function(err, dataObj) {
         if (err) return failure(err);
         else return success(JSON.parse(dataObj.Body));
     });
