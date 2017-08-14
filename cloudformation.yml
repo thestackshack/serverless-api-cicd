@@ -55,7 +55,7 @@ Resources:
           Action:
             - codepipeline:PutJobSuccessResult
             - codepipeline:PutJobFailureResult
-          Resource: *
+          Resource: '*'
         - Effect: Allow
           Action:
             - s3:GetObject
