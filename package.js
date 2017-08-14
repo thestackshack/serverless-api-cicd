@@ -4,7 +4,6 @@ var AWS = require('aws-sdk');
 
 exports.handler = function(event, context) {
 
-    console.log(JSON.stringify(event, null, 3));
     console.log(JSON.stringify(event));
 
     var codepipeline = new AWS.CodePipeline();
@@ -19,30 +18,37 @@ exports.handler = function(event, context) {
 
     // Get the builds.json file.
     var getBuildsFile = function(bucket, branch, callback) {
+        console.log('getBuildsFile');
         var params = {
             Bucket: bucket,
             Key: branch+'/builds.json'
         };
+        console.log(JSON.stringify(params));
         s3.getObject(params, callback);
     };
 
     // Put the builds.json file.
     var putBuildsFile = function(bucket, branch, data, callback) {
+        console.log('putBuildsFile');
         var params = {
-            Body: data,
+            Body: JSON.stringify(data),
             Bucket: bucket,
-            Key: branch+'/builds.json'
+            Key: branch+'/builds.json',
+            ContentType: 'application/json'
         };
+        console.log(JSON.stringify(params));
         s3.putObject(params, callback);
     };
 
     // Copy the artifact
     var copyBuildArtifact = function(bucket, key, branch, version, callback) {
+        console.log('copyBuildArtifact');
         var params = {
             Bucket: bucket,
-            CopySource: key,
+            CopySource: '/'+bucket+'/'+key,
             Key: branch+'/'+version
         };
+        console.log(JSON.stringify(params));
         s3.copyObject(params, callback);
     };
 
@@ -76,15 +82,16 @@ exports.handler = function(event, context) {
     };
 
     // Fetch the builds.json
-    getBuildsFile(bucket, branch, function(err, data) {
-        if (err && err.code === 'NotFound') {
-            data = {
+    getBuildsFile(bucket, branch, function(err, dataObj) {
+        if (err && err.code === 'NoSuchKey') {
+            var data = {
                 versions:[1],
                 max_version: 1
             };
         } else if (err) {
             return putJobFailure(err);
         } else {
+            var data = JSON.parse(dataObj.Body);
             data.versions.push(data.max_version+1);
             data.max_version += 1;
         }
