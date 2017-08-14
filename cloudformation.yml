@@ -44,13 +44,25 @@ Resources:
         Statement:
         - Effect: Allow
           Action:
-          - logs:CreateLogGroup
-          - logs:CreateLogStream
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
           Resource: arn:aws:logs:us-east-1:*:*
         - Effect: Allow
           Action:
-          - logs:PutLogEvents
+            - logs:PutLogEvents
           Resource: arn:aws:logs:us-east-1:*:*
+        - Effect: Allow
+          Action:
+            - codepipeline:PutJobSuccessResult
+            - codepipeline:PutJobFailureResult
+          Resource: *
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:ListBucket
+            - s3:PutObject
+          Resource: '*'
       Roles:
       - Ref: IamRoleLambdaExecution
 
@@ -437,16 +449,49 @@ Resources:
         ZipFile: |
           'use strict';
 
-          exports.handler = (event, context, callback) => {
-            const response = {
-              statusCode: 200,
-              body: JSON.stringify({
-                message: `Hello, the current time is ${new Date().toTimeString()}.`,
-                event: event
-              })
-            };
-            console.log(JSON.stringify(response, null, 3));
-            callback(null, response);
+          var AWS = require('aws-sdk');
+
+          exports.handler = function(event, context) {
+
+              console.log(JSON.stringify(event, null, 3));
+              console.log(JSON.stringify(event));
+
+              var codepipeline = new AWS.CodePipeline();
+
+              // Retrieve the Job ID from the Lambda action
+              var jobId = event["CodePipeline.job"].id;
+
+              // Notify AWS CodePipeline of a successful job
+              var putJobSuccess = function(message) {
+                  var params = {
+                      jobId: jobId
+                  };
+                  codepipeline.putJobSuccessResult(params, function(err, data) {
+                      if(err) {
+                          context.fail(err);
+                      } else {
+                          context.succeed(message);
+                      }
+                  });
+              };
+
+              // Notify AWS CodePipeline of a failed job
+              var putJobFailure = function(message) {
+                  var params = {
+                      jobId: jobId,
+                      failureDetails: {
+                          message: JSON.stringify(message),
+                          type: 'JobFailed',
+                          externalExecutionId: context.invokeid
+                      }
+                  };
+                  codepipeline.putJobFailureResult(params, function(err, data) {
+                      context.fail(message);
+                  });
+              };
+
+              // Succeed the job
+              putJobSuccess("Packaged successfully.");
           };
       Runtime: nodejs6.10
 
