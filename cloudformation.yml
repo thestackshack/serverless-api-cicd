@@ -528,10 +528,7 @@ Resources:
               - Name: BuildOutput
             Configuration:
               FunctionName: !Ref PackageFunction
-              UserParameters:
-                Fn::GetArtifactAtt:
-                  - BuildOutput
-                  - ObjectKey
+              UserParameters: !Ref BuildOutput
 
 #
 # Return the API Gateway endpoints.
