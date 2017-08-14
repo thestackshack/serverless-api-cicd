@@ -519,14 +519,14 @@ Resources:
       - Name: Package
         Actions:
           - Name: Package
-          ActionTypeId:
-            Category: Invoke
-            Owner: AWS
-            Provider: Lambda
-            Version: 1
-          Configuration:
-            FunctionName: !Ref PackageFunction
-            UserParameters: !Ref BuildOutput
+            ActionTypeId:
+              Category: Invoke
+              Owner: AWS
+              Provider: Lambda
+              Version: 1
+            Configuration:
+              FunctionName: !Ref PackageFunction
+              UserParameters: !Ref BuildOutput
 
 #
 # Return the API Gateway endpoints.
