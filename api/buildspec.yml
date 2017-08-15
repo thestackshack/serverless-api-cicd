@@ -18,7 +18,7 @@ phases:
     commands:
       - echo Build completed on `date`
 artifacts:
+  base-directory: 'api'
   files:
-    - 'api/**/*'
-  discard-paths: true
+    - '**/*'
   type: zip
