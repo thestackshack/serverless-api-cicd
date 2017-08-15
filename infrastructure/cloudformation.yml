@@ -536,12 +536,14 @@ Resources:
               Capabilities: CAPABILITY_IAM
               RoleArn: !GetAtt CloudFormationRole.Arn
               StackName: !Ref AWS::StackName
-              TemplatePath: SourceOutput::cloudformation.yml
+              TemplatePath: SourceOutput::infrastructure/cloudformation.yml
               ParameterOverrides: !Sub |
                 {
                   "GitHubOwner": "${GitHubOwner}",
                   "GitHubRepo": "${GitHubRepo}",
-                  "GitHubToken": "${GitHubToken}"
+                  "GitHubToken": "${GitHubToken}",
+                  "ArtifactsBucket": "${ArtifactsBucket}",
+                  "ProjectName": "${ProjectName}"
                 }
             InputArtifacts:
               - Name: SourceOutput
