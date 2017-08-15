@@ -8,16 +8,18 @@ phases:
   pre_build:
     commands:
       - echo Installing source NPM dependencies...
+      - cd api;
       - npm install
   build:
     commands:
       - echo Build started on `date`
       - echo Testing the code
+      - cd api/
       - npm test
   post_build:
     commands:
       - echo Build completed on `date`
 artifacts:
   files:
-    - '*'
+    - 'api/*'
   type: zip
