@@ -7,13 +7,15 @@ Parameters:
     Type: String
     Default: aws-codepipeline-nested-stack
     Description: GitHub repository name
-  GitHubBranch:
-    Type: String
-    Default: master
-    Description: GitHub repository branch
   GitHubToken:
     Type: String
     Description: GitHub repository OAuth token
+  ProjectName:
+    Type: String
+    Description: Project Name
+  ArtifactsBucket:
+    Type: String
+    Description: Artifacts bucket Name
 Resources:
 
   #
@@ -21,7 +23,6 @@ Resources:
   #
   CloudFormationRole:
     Type: AWS::IAM::Role
-    DependsOn: ArtifactsBucket
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -109,20 +110,12 @@ Resources:
           - IamRoleLambdaExecution
           - Arn
       Code:
-        ZipFile: |
-          'use strict';
-
-          exports.handler = (event, context, callback) => {
-            const response = {
-              statusCode: 200,
-              body: JSON.stringify({
-                message: `Hello, the current time is ${new Date().toTimeString()}.`,
-                event: event
-              })
-            };
-
-            callback(null, response);
-          };
+        S3Bucket: thestackshack
+        S3Key:
+          Fn::Join:
+            - ''
+            - - Ref: ArtifactsBucket
+              - '/index.js.zip'
       Runtime: nodejs6.10
 
   #
@@ -376,16 +369,6 @@ Resources:
   #
 
   #
-  # Artifact S3 bucket
-  #
-  ArtifactsBucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
-    Properties:
-      AccessControl: 'Private'
-      BucketName: 'serverless-api-cicd-build-artifacts'
-
-  #
   # Code Build IAM Role
   #
   CodeBuildRole:
@@ -457,10 +440,15 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/eb-nodejs-6.10.0-amazonlinux-64:4.0.0
         Type: LINUX_CONTAINER
-      Name: 'serverless-api-cicd'
+      Name:
+        Fn::Join:
+          - ''
+          - - Ref: ProjectName
+            - '-code-build'
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Source:
         Type: CODEPIPELINE
+        BuildSpec: api/buildspec.yml
       TimeoutInMinutes: 5 # must be between 5 minutes and 8 hours
 
   #
@@ -476,121 +464,12 @@ Resources:
           - IamRoleLambdaExecution
           - Arn
       Code:
-        ZipFile: |
-          'use strict';
-
-          var AWS = require('aws-sdk');
-
-          exports.handler = function(event, context) {
-
-              console.log(JSON.stringify(event));
-
-              var codepipeline = new AWS.CodePipeline();
-              var s3 = new AWS.S3();
-
-              // Retrieve the Job ID from the Lambda action
-              var jobId = event["CodePipeline.job"].id;
-
-              var bucket = event["CodePipeline.job"].data.inputArtifacts[0].location.s3Location.bucketName;
-              var key = event["CodePipeline.job"].data.inputArtifacts[0].location.s3Location.objectKey;
-              var branch = event["CodePipeline.job"].data.actionConfiguration.configuration.UserParameters;
-
-              // Get the builds.json file.
-              var getBuildsFile = function(bucket, branch, callback) {
-                  console.log('getBuildsFile');
-                  var params = {
-                      Bucket: bucket,
-                      Key: branch+'/builds.json'
-                  };
-                  console.log(JSON.stringify(params));
-                  s3.getObject(params, callback);
-              };
-
-              // Put the builds.json file.
-              var putBuildsFile = function(bucket, branch, data, callback) {
-                  console.log('putBuildsFile');
-                  var params = {
-                      Body: JSON.stringify(data),
-                      Bucket: bucket,
-                      Key: branch+'/builds.json',
-                      ContentType: 'application/json'
-                  };
-                  console.log(JSON.stringify(params));
-                  s3.putObject(params, callback);
-              };
-
-              // Copy the artifact
-              var copyBuildArtifact = function(bucket, key, branch, version, callback) {
-                  console.log('copyBuildArtifact');
-                  var params = {
-                      Bucket: bucket,
-                      CopySource: '/'+bucket+'/'+key,
-                      Key: branch+'/'+version
-                  };
-                  console.log(JSON.stringify(params));
-                  s3.copyObject(params, callback);
-              };
-
-              // Notify AWS CodePipeline of a successful job
-              var putJobSuccess = function(message) {
-                  var params = {
-                      jobId: jobId
-                  };
-                  codepipeline.putJobSuccessResult(params, function(err, data) {
-                      if(err) {
-                          context.fail(err);
-                      } else {
-                          context.succeed(message);
-                      }
-                  });
-              };
-
-              // Notify AWS CodePipeline of a failed job
-              var putJobFailure = function(message) {
-                  var params = {
-                      jobId: jobId,
-                      failureDetails: {
-                          message: JSON.stringify(message),
-                          type: 'JobFailed',
-                          externalExecutionId: context.invokeid
-                      }
-                  };
-                  codepipeline.putJobFailureResult(params, function(err, data) {
-                      context.fail(message);
-                  });
-              };
-
-              // Fetch the builds.json
-              getBuildsFile(bucket, branch, function(err, dataObj) {
-                  if (err && err.code === 'NoSuchKey') {
-                      var data = {
-                          versions:[1],
-                          max_version: 1
-                      };
-                  } else if (err) {
-                      return putJobFailure(err);
-                  } else {
-                      var data = JSON.parse(dataObj.Body);
-                      data.versions.push(data.max_version+1);
-                      data.max_version += 1;
-                  }
-
-                  copyBuildArtifact(bucket, key, branch, data.max_version, function(err, results) {
-                      if (err) {
-                          return putJobFailure(err);
-                      } else {
-                          putBuildsFile(bucket, branch, data, function(err, results) {
-                              if (err) {
-                                  return putJobFailure(err);
-                              } else {
-                                  // Succeed the job
-                                  putJobSuccess("Packaged successfully. version:"+data.max_version);
-                              }
-                          });
-                      }
-                  });
-              });
-          };
+        S3Bucket: thestackshack
+        S3Key:
+          Fn::Join:
+            - ''
+            - - Ref: ArtifactsBucket
+              - '/package.js.zip'
       Runtime: nodejs6.10
 
   #
@@ -607,7 +486,11 @@ Resources:
           - Arn
       Code:
         S3Bucket: thestackshack
-        S3Key: serverless-api-cicd/deploy.js.zip
+        S3Key:
+          Fn::Join:
+            - ''
+            - - Ref: ArtifactsBucket
+              - '/deploy.js.zip'
       Runtime: nodejs6.10
   ShowFunction:
     Type: AWS::Lambda::Function
@@ -620,7 +503,11 @@ Resources:
           - Arn
       Code:
         S3Bucket: thestackshack
-        S3Key: serverless-api-cicd/deploy.js.zip
+        S3Key:
+          Fn::Join:
+            - ''
+            - - Ref: ArtifactsBucket
+              - '/deploy.js.zip'
       Runtime: nodejs6.10
 
   #
@@ -647,7 +534,7 @@ Resources:
           Configuration:
             Owner: !Ref GitHubOwner
             Repo: !Ref GitHubRepo
-            Branch: !Ref GitHubBranch
+            Branch: 'master'
             OAuthToken: !Ref GitHubToken
           OutputArtifacts:
             - Name: SourceOutput
@@ -670,7 +557,6 @@ Resources:
                 {
                   "GitHubOwner": "${GitHubOwner}",
                   "GitHubRepo": "${GitHubRepo}",
-                  "GitHubBranch": "${GitHubBranch}",
                   "GitHubToken": "${GitHubToken}"
                 }
             InputArtifacts:

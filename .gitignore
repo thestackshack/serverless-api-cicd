@@ -1,5 +1,6 @@
 
 # Dependency directories
 node_modules
-.params.json
+api/node_modules
+infrastructure/.params.json
 *.zip

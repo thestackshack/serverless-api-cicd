@@ -1,5 +1,5 @@
 # Serverless API with CI/CD
-The template: [cloudformation.yml](cloudformation.yml)
+The template: [cloudformation.yml](infrastructure/cloudformation.yml)
 
 ** This is a work in progress.  Still working on the CI/CD Github integration.
 

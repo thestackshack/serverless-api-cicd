@@ -2,20 +2,18 @@
   "name": "thestackshack-serverless-api-cicd",
   "version": "1.0.0",
   "description": "Serverless API CI/CD by The Stack Shack",
+  "main": "index.js",
   "dependencies": {
-    "archiver": "^2.0.0",
     "async": "^2.1.4",
     "aws-sdk": "^2.7.7",
     "lodash": "^4.17.2",
-    "prompt": "^1.0.0",
     "winston": "^2.3.0"
   },
   "devDependencies": {
     "mocha": "^3.1.2"
   },
   "scripts": {
-    "test": "mocha",
-    "deployer": "node cli/index.js"
+    "test": "mocha"
   },
   "author": "rgfindley@gmail.com"
 }
