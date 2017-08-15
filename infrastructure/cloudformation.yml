@@ -105,6 +105,7 @@ Resources:
     DependsOn: CloudFormationRole
     Properties:
       Handler: index.handler
+      Timeout: 5
       Role:
         Fn::GetAtt:
           - IamRoleLambdaExecution
@@ -455,6 +456,7 @@ Resources:
     DependsOn: CloudFormationRole
     Properties:
       Handler: package.handler
+      Timeout: 5
       Role:
         Fn::GetAtt:
           - IamRoleLambdaExecution
@@ -472,6 +474,7 @@ Resources:
     DependsOn: CloudFormationRole
     Properties:
       Handler: deploy.deploy
+      Timeout: 5
       Role:
         Fn::GetAtt:
           - IamRoleLambdaExecution
@@ -485,6 +488,7 @@ Resources:
     DependsOn: CloudFormationRole
     Properties:
       Handler: deploy.show
+      Timeout: 5
       Role:
         Fn::GetAtt:
           - IamRoleLambdaExecution

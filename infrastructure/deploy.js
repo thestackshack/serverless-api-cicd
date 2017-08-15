@@ -79,7 +79,8 @@ exports.deploy = function(event, context, callback) {
             if (err) return next(err); // an error occurred
             var versionsInUse = [];
             for (var i = 0 ; i < data.Aliases.length ; i++) {
-                versionsInUse.push(data.Aliases[i].FunctionVersion);
+                if (data.Aliases[i].FunctionVersion !== '$LATEST')
+                    versionsInUse.push(data.Aliases[i].FunctionVersion);
             }
             var params = {
                 FunctionName: event.lambda, /* required */
