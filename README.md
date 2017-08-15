@@ -12,32 +12,9 @@ The template: [cloudformation.yml](infrastructure/cloudformation.yml)
 * CloudFormation (Infrastructure as Code)
 * IAM (AWS permissions & users)
 
-## Create Stack
-```
-aws cloudformation create-stack \
---stack-name serverless-stack \
---template-body file:///<your-path>/cloudformation.yml \
---tags=Key=app,Value=serverless-stack \
---capabilities CAPABILITY_IAM \
---parameters file:///<your-path>/params.json \
---profile bluefin
-```
+## Usage
+Usage: npm run deployer -- <command>.  command = [help, stackup, show, deploy]
 
-aws cloudformation create-stack \
---stack-name serverless-stack \
---template-body file:///Users/findleyr/Documents/code/thestackshack/serverless-api-cicd/cloudformation.yml \
---tags=Key=app,Value=serverless-stack \
---capabilities CAPABILITY_IAM \
---parameters file:///Users/findleyr/Documents/code/thestackshack/serverless-api-cicd/.params.json \
---profile bluefin
-
-### Pipeline to update stack and deploy lambda
-https://github.com/milancermak/lambda-pipeline/tree/master/infrastructure
-https://github.com/wjordan/aws-codepipeline-nested-stack/blob/master/cfn-template.yml
-
-## CLI
-- Collect params.
-- Zip and upload deploy.js
-- Execute CF create stack
-- Deploy...
-- Show...
+* stackup - Deploy the stack to AWS after you've created your repo and pushed to the 'master' branch.
+* show - Show the version information about the api.  'npm run deployer -- show <branch>'.  branch = [master | develop]
+* deploy - Deploy the built version to the api.  'npm run deployer -- deploy <branch> <version>.  branch = [master | develop]
