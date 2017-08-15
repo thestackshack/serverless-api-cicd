@@ -110,12 +110,8 @@ Resources:
           - IamRoleLambdaExecution
           - Arn
       Code:
-        S3Bucket: thestackshack
-        S3Key:
-          Fn::Join:
-            - ''
-            - - Ref: ArtifactsBucket
-              - '/index.js.zip'
+        S3Bucket: !Ref ArtifactsBucket
+        S3Key: 'index.js.zip'
       Runtime: nodejs6.10
 
   #
@@ -464,12 +460,8 @@ Resources:
           - IamRoleLambdaExecution
           - Arn
       Code:
-        S3Bucket: thestackshack
-        S3Key:
-          Fn::Join:
-            - ''
-            - - Ref: ArtifactsBucket
-              - '/package.js.zip'
+        S3Bucket: !Ref ArtifactsBucket
+        S3Key: 'package.js.zip'
       Runtime: nodejs6.10
 
   #
@@ -485,12 +477,8 @@ Resources:
           - IamRoleLambdaExecution
           - Arn
       Code:
-        S3Bucket: thestackshack
-        S3Key:
-          Fn::Join:
-            - ''
-            - - Ref: ArtifactsBucket
-              - '/deploy.js.zip'
+        S3Bucket: !Ref ArtifactsBucket
+        S3Key: 'deploy.js.zip'
       Runtime: nodejs6.10
   ShowFunction:
     Type: AWS::Lambda::Function
@@ -502,12 +490,8 @@ Resources:
           - IamRoleLambdaExecution
           - Arn
       Code:
-        S3Bucket: thestackshack
-        S3Key:
-          Fn::Join:
-            - ''
-            - - Ref: ArtifactsBucket
-              - '/deploy.js.zip'
+        S3Bucket: !Ref ArtifactsBucket
+        S3Key: 'deploy.js.zip'
       Runtime: nodejs6.10
 
   #
