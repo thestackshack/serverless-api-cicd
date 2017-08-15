@@ -33,7 +33,7 @@ var failure = function(err, callback) {
 };
 
 exports.show = function(event, context, callback) {
-    getBuildsFile(event.artifactBucket, evnet.branch, function(err, dataObj) {
+    getBuildsFile(event.artifactBucket, event.branch, function(err, dataObj) {
         if (err) return failure(err, callback);
         else return success(JSON.parse(dataObj.Body), callback);
     });
@@ -79,8 +79,7 @@ exports.deploy = function(event, context, callback) {
             if (err) return next(err); // an error occurred
             var versionsInUse = [];
             for (var i = 0 ; i < data.Aliases.length ; i++) {
-                if (data.Aliases[i].FunctionVersion !== '$LATEST')
-                    versionsInUse.push(data.Aliases[i].FunctionVersion);
+                versionsInUse.push(data.Aliases[i].FunctionVersion);
             }
             var params = {
                 FunctionName: event.lambda, /* required */
@@ -91,7 +90,7 @@ exports.deploy = function(event, context, callback) {
                 var deleteErr = null;
                 var loopDelete = function(i) {
                     if( i < data.Versions.length ) {
-                        if (versionsInUse.indexOf(data.Versions[i].Version) === -1) {
+                        if (versionsInUse.indexOf(data.Versions[i].Version) === -1 && data.Versions[i].Version !== '$LATEST') {
                             console.log('deleteOldVersion');
                             var params = {
                                 FunctionName: event.lambda, /* required */
