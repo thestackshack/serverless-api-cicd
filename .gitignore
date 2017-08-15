@@ -4,3 +4,4 @@ node_modules
 api/node_modules
 infrastructure/.params.json
 *.zip
+cli/.stackdata

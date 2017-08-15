@@ -20,4 +20,5 @@ phases:
 artifacts:
   files:
     - 'api/*'
+  discard-paths: true
   type: zip

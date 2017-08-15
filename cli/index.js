@@ -10,6 +10,7 @@ var credentials = new AWS.SharedIniFileCredentials({profile: 'bluefin'});
 AWS.config.credentials = credentials;
 var s3 = new AWS.S3();
 var cloudformation = new AWS.CloudFormation();
+var lambda = new AWS.Lambda();
 
 var uploadCFTemplate = function(path, bucket, next) {
 
@@ -90,156 +91,248 @@ var zipUploadDelete = function(path, filename, bucket, next) {
     archive.finalize();
 };
 
-var stackup = function() {
-
-    //
-    // Start the prompt
-    //
-    prompt.start();
-
-    //
-    // Get two properties from the user: username and email
-    //
-    var schema = {
-        properties: {
-            ProjectName: {
-                description: 'Please enter a name for your project.  This will be the CloudFormation stack name and used as a prefix for many of the resources.',
-                pattern: /^[a-zA-Z0-9-]+$/,
-                message: 'Name must be only letters, numbers, or dashes',
-                required: true
-            },
-            GitHubOwner: {
-                description: 'Your github username or organization name.',
-                required: true
-            },
-            GitHubRepo: {
-                description: 'Your github repo name.',
-                required: true
-            },
-            GitHubToken: {
-                description: 'Your github personal access token.  https://github.com/settings/tokens, needs "repo" and "admin:repo_hook" checked.',
-                required: true
-            }
-        }
+var getBuildsFile = function(bucket, branch, callback) {
+    var params = {
+        Bucket: bucket,
+        Key: branch+'/builds.json'
     };
-    prompt.get(schema, function (err, inputs) {
+    s3.getObject(params, callback);
+};
+
+var show = function(branch) {
+    fs.readFile(__dirname + '/.stackdata', function (err, data) {
         if (err) {
-            console.log('Invalid inputs.');
-            process.exit(0);
+            throw err;
         }
-        var bucket = inputs.ProjectName+'-build-artifacts';
-        async.waterfall([
-            function(next) {
-                //
-                // Create the S3 bucket to upload the lambda's to.
-                //
-                console.log('Creating S3 artifacts bucket.');
-                var params = {
-                    Bucket: bucket
-                };
-                s3.createBucket(params, next);
-            },
-            function(data, next) {
-                //
-                // Zip and upload the api/index, infrastructure/deploy.js, and infrastructure/package.js
-                //
-                console.log('upload index.js lambda to S3');
-                zipUploadDelete('/../api/', 'index.js', bucket, next);
-            },
-            function(data, next) {
-                //
-                // Zip and upload the api/index, infrastructure/deploy.js, and infrastructure/package.js
-                //
-                console.log('upload deploy.js lambda to S3');
-                zipUploadDelete('/../infrastructure/', 'deploy.js', bucket, next);
-            },
-            function(data, next) {
-                //
-                // Zip and upload the api/index, infrastructure/deploy.js, and infrastructure/package.js
-                //
-                console.log('upload package.js lambda to S3');
-                zipUploadDelete('/../infrastructure/', 'package.js', bucket, next);
-            },
-            function(data, next) {
-                console.log('Upload CF template to S3');
-                uploadCFTemplate(__dirname + '/../infrastructure/cloudformation.yml', bucket, next);
-            },
-            function(data, next) {
-                console.log('Creating stack');
-                var params = {
-                    StackName: inputs.ProjectName, /* required */
-                    Capabilities: [
-                        'CAPABILITY_IAM'
-                    ],
-                    OnFailure: 'DO_NOTHING',
-                    Parameters: [
-                        {
-                            ParameterKey: 'ArtifactsBucket',
-                            ParameterValue: bucket,
-                            UsePreviousValue: true
-                        },
-                        {
-                            ParameterKey: 'ProjectName',
-                            ParameterValue: inputs.ProjectName,
-                            UsePreviousValue: true
-                        },
-                        {
-                            ParameterKey: 'GitHubOwner',
-                            ParameterValue: inputs.GitHubOwner,
-                            UsePreviousValue: true
-                        },
-                        {
-                            ParameterKey: 'GitHubRepo',
-                            ParameterValue: inputs.GitHubRepo,
-                            UsePreviousValue: true
-                        },
-                        {
-                            ParameterKey: 'GitHubToken',
-                            ParameterValue: inputs.GitHubToken,
-                            UsePreviousValue: true
-                        }
-                    ],
-                    Tags: [
-                        {
-                            Key: 'App', /* required */
-                            Value: inputs.ProjectName /* required */
-                        }
-                    ],
-                    TemplateURL: data
-                };
-                cloudformation.createStack(params, next);
-            },
-            function (data, next) {
-                var params = {
-                    StackName: inputs.ProjectName
-                };
-                cloudformation.waitFor('stackExists', params, next);
-            }
-        ], function(err, results) {
-            if (err) console.log(err);
-            console.log('Done!');
+        var stackdata = JSON.parse(data);
+        getBuildsFile(stackdata.artifactBucket, branch, function(err, dataObj) {
+            if (err) throw err;
+            var data = JSON.parse(dataObj.Body);
+            console.log(JSON.stringify(data, null, 3));
         });
     });
 };
 
-var usage = function() {
-    console.log('Usage: npm run deployer -- <command>.  command = [help, stackup, show, deploy]');
-    console.log('');
-    console.log('stackup - Deploy the stack to AWS after you\'ve created your repo and pushed to the \'master\' branch.');
-    console.log('show - Show the version information about the api.  \'npm run deployer -- show <branch>\'.  branch = [master | develop]');
-    console.log('deploy - Deploy the built version to the api.  \'npm run deployer -- deploy <branch> <version>.  branch = [master | develop]');
-    console.log('');
+var deploy = function(branch, version) {
+    fs.readFile(__dirname + '/.stackdata', function (err, data) {
+        if (err) {
+            throw err;
+        }
+        var stackdata = JSON.parse(data);
+        // Execute deployer lambda
+        var event = {
+            branch: branch,
+            version: version,
+            artifactBucket: stackdata.artifactBucket,
+            lambda: stackdata.APIFunction
+        };
+        var params = {
+            FunctionName: stackdata.DeployFunction, /* required */
+            InvocationType: 'RequestResponse',
+            LogType: 'Tail',
+            Payload: JSON.stringify(event)
+        };
+        lambda.invoke(params, function(err, data) {
+            if (err) throw err;
+            if (_.isEqual(data.StatusCode, 200) && JSON.parse(data.Payload).success)
+                console.log('version '+version+' deployed.');
+            else {
+                console.log('Failed to deploy.');
+                console.log(JSON.stringify(data, null, 3));
+            }
+        });
+    });
 };
 
-if (_.size(process.argv) < 3 ||
-    !_.includes(['help', 'stackup', 'show', 'deploy'], process.argv[2]) ||
-    _.isEqual(process.argv[2], 'help')) {
-    usage();
-} else {
-    var command = process.argv[2];
-    if (_.isEqual(command, 'stackup')) {
-        stackup();
-    }
-}
+var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken) {
+    var bucket = ProjectName+'-build-artifacts';
+    async.waterfall([
+        function(next) {
+            //
+            // Create the S3 bucket to upload the lambda's to.
+            //
+            console.log('Creating S3 artifacts bucket.');
+            var params = {
+                Bucket: bucket
+            };
+            s3.createBucket(params, next);
+        },
+        function(data, next) {
+            //
+            // Zip and upload the api/index, infrastructure/deploy.js, and infrastructure/package.js
+            //
+            console.log('upload index.js lambda to S3');
+            zipUploadDelete('/../api/', 'index.js', bucket, next);
+        },
+        function(data, next) {
+            //
+            // Zip and upload the api/index, infrastructure/deploy.js, and infrastructure/package.js
+            //
+            console.log('upload deploy.js lambda to S3');
+            zipUploadDelete('/../infrastructure/', 'deploy.js', bucket, next);
+        },
+        function(data, next) {
+            //
+            // Zip and upload the api/index, infrastructure/deploy.js, and infrastructure/package.js
+            //
+            console.log('upload package.js lambda to S3');
+            zipUploadDelete('/../infrastructure/', 'package.js', bucket, next);
+        },
+        function(data, next) {
+            console.log('Upload CF template to S3');
+            uploadCFTemplate(__dirname + '/../infrastructure/cloudformation.yml', bucket, next);
+        },
+        function(data, next) {
+            console.log('Creating stack');
+            var params = {
+                StackName: ProjectName, /* required */
+                Capabilities: [
+                    'CAPABILITY_IAM'
+                ],
+                OnFailure: 'DO_NOTHING',
+                Parameters: [
+                    {
+                        ParameterKey: 'ArtifactsBucket',
+                        ParameterValue: bucket,
+                        UsePreviousValue: true
+                    },
+                    {
+                        ParameterKey: 'ProjectName',
+                        ParameterValue: ProjectName,
+                        UsePreviousValue: true
+                    },
+                    {
+                        ParameterKey: 'GitHubOwner',
+                        ParameterValue: GitHubOwner,
+                        UsePreviousValue: true
+                    },
+                    {
+                        ParameterKey: 'GitHubRepo',
+                        ParameterValue: GitHubRepo,
+                        UsePreviousValue: true
+                    },
+                    {
+                        ParameterKey: 'GitHubToken',
+                        ParameterValue: GitHubToken,
+                        UsePreviousValue: true
+                    }
+                ],
+                Tags: [
+                    {
+                        Key: 'App', /* required */
+                        Value: ProjectName /* required */
+                    }
+                ],
+                TemplateURL: data
+            };
+            cloudformation.createStack(params, next);
+        },
+        function (data, next) {
+            //
+            // Create the stack.
+            //
+            var params = {
+                StackName: ProjectName
+            };
+            cloudformation.waitFor('stackCreateComplete', params, next);
+        },
+        function (data, next) {
+            //
+            // Store the stack name
+            //
+            if (_.includes(['UPDATE_COMPLETE', 'CREATE_COMPLETE'], data.Stacks[0].StackStatus)) {
+                var stackData = {
+                    artifactBucket: bucket,
+                    DeployFunction: _.find(data.Stacks[0].Outputs, {OutputKey: 'DeployFunction'}).OutputValue,
+                    ShowFunction: _.find(data.Stacks[0].Outputs, {OutputKey: 'ShowFunction'}).OutputValue,
+                    ServiceEndpointProd: _.find(data.Stacks[0].Outputs, {OutputKey: 'ServiceEndpointProd'}).OutputValue,
+                    ServiceEndpointDev: _.find(data.Stacks[0].Outputs, {OutputKey: 'ServiceEndpointDev'}).OutputValue,
+                    APIFunction: _.find(data.Stacks[0].Outputs, {OutputKey: 'APIFunction'}).OutputValue
+                };
+                fs.writeFile(__dirname + '/.stackdata', JSON.stringify(stackData, null, 3), function(err) {
+                    if(err) {
+                        next(err, null);
+                    }
 
+                    next(null, stackData);
+                });
 
+            } else
+                next(data.Stacks[0].StackStatusReason, data);
+        }
+    ], function(err, results) {
+        if (err) console.log(err);
+        console.log('Done!');
+        console.log('Prod API Endpoint: '+results.ServiceEndpointProd);
+        console.log('Dev API Endpoint: '+results.ServiceEndpointDev);
+    });
+};
+
+var args = require('yargs')
+    .usage('npm run deployer -- <cmd> [args]')
+    .command('stackup [ProjectName] [GitHubOwner] [GitHubRepo] [GitHubToken] [profile]', 'Deploy the stack.', {
+        ProjectName: {
+            describe: 'Please enter a name for your project.  This will be the CloudFormation stack name and used as a prefix for many of the resources.',
+            required: true
+        },
+        GitHubOwner: {
+            describe: 'Your github username or organization name.',
+            required: true
+        },
+        GitHubRepo: {
+            describe: 'Your github repo name.',
+            required: true
+        },
+        GitHubToken: {
+            describe: 'Your github personal access token.  https://github.com/settings/tokens, needs "repo" and "admin:repo_hook" checked.',
+            required: true
+        },
+        profile: {
+            describe: 'Your AWS credentials profile.'
+        }
+    }, function (argv) {
+        if (argv.profile) {
+            console.log('setting AWS profile: '+argv.profile);
+            var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
+            AWS.config.credentials = credentials;
+        }
+        stackup(argv.ProjectName, argv.GitHubOwner, argv.GitHubRepo, argv.GitHubToken);
+    })
+    .command('deploy [branch] [version]', 'Deploy a new version of the api.', {
+        branch: {
+            describe: 'branch.  [master | develop]',
+            required: true
+        },
+        version: {
+            describe: 'The version that has been built.',
+            required: true
+        },
+        profile: {
+            describe: 'Your AWS credentials profile.'
+        }
+    }, function (argv) {
+        if (argv.profile) {
+            console.log('setting AWS profile: '+argv.profile);
+            var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
+            AWS.config.credentials = credentials;
+        }
+        deploy(argv.branch, argv.version);
+    })
+    .command('show [branch]', 'Show deployment history, currently deployed version, and built versions.', {
+        branch: {
+            describe: 'branch.  [master | develop]',
+            required: true
+        },
+        profile: {
+            describe: 'Your AWS credentials profile.'
+        }
+    }, function (argv) {
+        if (argv.profile) {
+            console.log('setting AWS profile: '+argv.profile);
+            var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
+            AWS.config.credentials = credentials;
+        }
+        show(argv.branch);
+    })
+    .help()
+    .argv;

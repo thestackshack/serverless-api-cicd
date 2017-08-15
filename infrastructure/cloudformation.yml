@@ -662,3 +662,6 @@ Outputs:
   ShowFunction:
     Description: Show Lambda Function
     Value: !Ref ShowFunction
+  APIFunction:
+    Description: API Lambda Function
+    Value: !Ref APIFunction
