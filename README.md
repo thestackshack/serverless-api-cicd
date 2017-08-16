@@ -22,12 +22,14 @@ Usage: `npm run deployer -- <command>`.  command = [help, stackup, show, deploy]
 ### stackup
 Run this command one time to build the stack.
 
-`npm run deployer -- stackup \
+```
+npm run deployer -- stackup \
 --ProjectName=<project_name> \
 --GitHubOwner=<user_or_organization> \
 --GitHubRepo=<repo> \
 --GitHubToken=<token> \
---profile=<aws_profile>`
+--profile=<aws_profile>
+```
 
 **ProjectName**:  Please enter a name for your project.  This will be the
                  CloudFormation stack name and used as a prefix for many of the
@@ -46,10 +48,12 @@ Run this command one time to build the stack.
 ### deploy
 Run this command to deploy a new version to either the */prod* or */dev* endpoint.
 
-`npm run deployer -- deploy \
+```
+npm run deployer -- deploy \
 --branch=<master> \
 --version=<1> \
---profile=<aws_profile>`
+--profile=<aws_profile>
+```
 
 **branch**:   Deploy to prod or dev.  [master | develop]
 
@@ -60,9 +64,10 @@ Run this command to deploy a new version to either the */prod* or */dev* endpoin
 ### show
 Run this command to see what versions have been built and which version is currently running.  The deployment history is also available.
 
-`npm run deployer -- show \
+```npm run deployer -- show \
 --branch=<master> \
---profile=<aws_profile>`
+--profile=<aws_profile>
+```
 
 **branch**:   Which environment? prod or dev.  [master | develop]
 
