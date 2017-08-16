@@ -6,11 +6,9 @@ var fs = require('fs');
 var archiver = require('archiver');
 
 var AWS = require('aws-sdk');
-var credentials = new AWS.SharedIniFileCredentials({profile: 'bluefin'});
-AWS.config.credentials = credentials;
-var s3 = new AWS.S3();
-var cloudformation = new AWS.CloudFormation();
-var lambda = new AWS.Lambda();
+var s3;
+var cloudformation;
+var lambda;
 
 var uploadCFTemplate = function(path, bucket, next) {
 
@@ -296,9 +294,12 @@ var args = require('yargs')
             var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
             AWS.config.credentials = credentials;
         }
+        s3 = new AWS.S3();
+        cloudformation = new AWS.CloudFormation();
+        lambda = new AWS.Lambda();
         stackup(argv.ProjectName, argv.GitHubOwner, argv.GitHubRepo, argv.GitHubToken);
     })
-    .command('deploy [branch] [version]', 'Deploy a new version of the api.', {
+    .command('deploy [branch] [version] [profile]', 'Deploy a new version of the api.', {
         branch: {
             describe: 'branch.  [master | develop]',
             required: true
@@ -316,9 +317,12 @@ var args = require('yargs')
             var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
             AWS.config.credentials = credentials;
         }
+        s3 = new AWS.S3();
+        cloudformation = new AWS.CloudFormation();
+        lambda = new AWS.Lambda();
         deploy(argv.branch, argv.version);
     })
-    .command('show [branch]', 'Show deployment history, currently deployed version, and built versions.', {
+    .command('show [branch] [profile]', 'Show deployment history, currently deployed version, and built versions.', {
         branch: {
             describe: 'branch.  [master | develop]',
             required: true
@@ -332,6 +336,9 @@ var args = require('yargs')
             var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
             AWS.config.credentials = credentials;
         }
+        s3 = new AWS.S3();
+        cloudformation = new AWS.CloudFormation();
+        lambda = new AWS.Lambda();
         show(argv.branch);
     })
     .help()

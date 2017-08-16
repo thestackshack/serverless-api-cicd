@@ -19,6 +19,51 @@ Use the command line tools to quickly deploy a new version to either the dev or 
 ## Usage
 Usage: `npm run deployer -- <command>`.  command = [help, stackup, show, deploy]
 
-* stackup - Deploy the stack to AWS after you've created your repo and pushed to the 'master' branch.
-* show - Show the version information about the api.  `npm run deployer -- show <branch>`.  branch = [master | develop]
-* deploy - Deploy the built version to the api.  `npm run deployer -- deploy <branch> <version>`.  branch = [master | develop]
+### stackup
+Run this command one time to build the stack.
+
+`npm run deployer -- stackup \
+--ProjectName=<project_name> \
+--GitHubOwner=<user_or_organization> \
+--GitHubRepo=<repo> \
+--GitHubToken=<token> \
+--profile=<aws_profile>`
+
+**ProjectName**:  Please enter a name for your project.  This will be the
+                 CloudFormation stack name and used as a prefix for many of the
+                 resources.
+
+**GitHubOwner**:  Your github username or organization name.
+
+**GitHubRepo**:   Your github repo name.
+
+**GitHubToken**:  Your github personal access token.
+                 https://github.com/settings/tokens, needs "repo" and
+                 "admin:repo_hook" checked.
+
+**profile**:      Your AWS credentials profile. [optional]
+
+### deploy
+Run this command to deploy a new version to either the */prod* or */dev* endpoint.
+
+`npm run deployer -- deploy \
+--branch=<master> \
+--version=<1> \
+--profile=<aws_profile>`
+
+**branch**:   Deploy to prod or dev.  [master | develop]
+
+**version**:   Which built version to deploy?
+
+**profile**:      Your AWS credentials profile. [optional]
+
+### show
+Run this command to see what versions have been built and which version is currently running.  The deployment history is also available.
+
+`npm run deployer -- show \
+--branch=<master> \
+--profile=<aws_profile>`
+
+**branch**:   Which environment? prod or dev.  [master | develop]
+
+**profile**:      Your AWS credentials profile. [optional]
