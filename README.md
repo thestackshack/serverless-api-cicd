@@ -1,7 +1,7 @@
 # Serverless API with CI/CD
 The template: [cloudformation.yml](infrastructure/cloudformation.yml)
 
-Quickly deploy an API (API Gateway + Lambda) with /prod/api and /dev/api endpoints.  Each can be running a different version of the Lambda function.
+Quickly deploy an API (API Gateway + Lambda) with _/prod_ and _/dev_ endpoints.  Each can be running a different version of the Lambda function.
 
 Built in CI/CD using CodePipeline & CodeBuild which pulls from your GitHub repo.  Just push your changes to either the develop or master branch and a new version of the Lambda is tested and built.
 
