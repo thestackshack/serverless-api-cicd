@@ -64,7 +64,8 @@ npm run deployer -- deploy \
 ### show
 Run this command to see what versions have been built and which version is currently running.  The deployment history is also available.
 
-```npm run deployer -- show \
+```
+npm run deployer -- show \
 --branch=<master> \
 --profile=<aws_profile>
 ```
