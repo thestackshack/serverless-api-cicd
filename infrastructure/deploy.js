@@ -134,14 +134,25 @@ exports.deploy = function(event, context, callback) {
             if (err) return next(err);
             else {
                 var data = JSON.parse(dataObj.Body);
+                var versionObj;
+                for (var i = 0 ; i < data.versions.length ; i++) {
+                    if (data.versions[i] === version)
+                        versionObj = data.versions[i];
+                }
                 if (!data.history) {
                     data.history = [];
                 }
                 data.history.push({
-                    version: version,
-                    date: new Date()
+                    version: versionObj.version,
+                    date: new Date(),
+                    commit: versionObj.commit
                 });
-                data.current_version = version;
+                data.current_version = {
+                    version: versionObj.version,
+                    build_date: versionObj.data,
+                    deploy_date: new Date(),
+                    commit: versionObj.commit
+                };
                 putBuildsFile(bucket, branch, data, function(err, results) {
                     next(err);
                 });

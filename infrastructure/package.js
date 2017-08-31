@@ -13,11 +13,11 @@ exports.handler = function(event, context) {
     var jobId = event["CodePipeline.job"].id;
 
     if (event["CodePipeline.job"].data.inputArtifacts[0].revision) {
-        var BuildOutput = event["CodePipeline.job"].data.inputArtifacts[0];
-        var SourceOutput = event["CodePipeline.job"].data.inputArtifacts[1];
-    } else {
-        var BuildOutput = event["CodePipeline.job"].data.inputArtifacts[1];
         var SourceOutput = event["CodePipeline.job"].data.inputArtifacts[0];
+        var BuildOutput = event["CodePipeline.job"].data.inputArtifacts[1];
+    } else {
+        var SourceOutput = event["CodePipeline.job"].data.inputArtifacts[1];
+        var BuildOutput = event["CodePipeline.job"].data.inputArtifacts[0];
     }
     var bucket = BuildOutput.location.s3Location.bucketName;
     var key = BuildOutput.location.s3Location.objectKey;
@@ -99,14 +99,26 @@ exports.handler = function(event, context) {
                     date: new Date(),
                     commit: commit
                 }],
-                max_version: 1
+                max_version: {
+                    version: 1,
+                    date: new Date(),
+                    commit: commit
+                }
             };
         } else if (err) {
             return putJobFailure(err);
         } else {
             var data = JSON.parse(dataObj.Body);
-            data.versions.push(data.max_version+1);
-            data.max_version += 1;
+            data.versions.push({
+                version: data.max_version.version+1,
+                date: new Date(),
+                commit: commit
+            });
+            data.max_version = {
+                version: data.max_version.version+1,
+                date: new Date(),
+                commit: commit
+            };
         }
 
         copyBuildArtifact(bucket, key, branch, data.max_version, function(err, results) {

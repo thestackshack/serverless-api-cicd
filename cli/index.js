@@ -111,18 +111,24 @@ var show = function(branch) {
             if (data.history) {
                 console.log('## History ##');
                 _.forEach(_.take(_.reverse(data.history), 3), function(item) {
-                    console.log('Version '+item.version+' deployed on '+ moment(item.date).format("dddd, MMMM Do YYYY, h:mm:ss a"))
+                    console.log('Version '+item.version+' deployed on '+ moment(item.date).format("dddd, MMMM Do YYYY, h:mm:ss a"));
+                    console.log('commit: '+item.commit);
                 });
                 console.log('');
             }
             if (data.max_version) {
                 console.log('## Builds ##');
-                console.log('The latest build is '+data.max_version);
+                console.log('The latest build is '+data.max_version.version);
+                console.log('build on '+ moment(data.max_version.date).format("dddd, MMMM Do YYYY, h:mm:ss a"));
+                console.log('commit: '+data.max_version.commit);
                 console.log('');
             }
             if (data.current_version) {
                 console.log('## Running ##');
-                console.log('The current running build is '+data.current_version);
+                console.log('The current running build is '+data.current_version.version);
+                console.log('build on '+ moment(data.current_version.build_date).format("dddd, MMMM Do YYYY, h:mm:ss a"));
+                console.log('deployed on '+ moment(data.current_version.deploy_date).format("dddd, MMMM Do YYYY, h:mm:ss a"));
+                console.log('commit: '+data.current_version.commit);
                 console.log('');
             }
         });
