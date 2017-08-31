@@ -12,9 +12,18 @@ exports.handler = function(event, context) {
     // Retrieve the Job ID from the Lambda action
     var jobId = event["CodePipeline.job"].id;
 
-    var bucket = event["CodePipeline.job"].data.inputArtifacts[0].location.s3Location.bucketName;
-    var key = event["CodePipeline.job"].data.inputArtifacts[0].location.s3Location.objectKey;
+    if (event["CodePipeline.job"].data.inputArtifacts[0].revision) {
+        var BuildOutput = event["CodePipeline.job"].data.inputArtifacts[0];
+        var SourceOutput = event["CodePipeline.job"].data.inputArtifacts[1];
+    } else {
+        var BuildOutput = event["CodePipeline.job"].data.inputArtifacts[1];
+        var SourceOutput = event["CodePipeline.job"].data.inputArtifacts[0];
+    }
+    var bucket = BuildOutput.location.s3Location.bucketName;
+    var key = BuildOutput.location.s3Location.objectKey;
     var branch = event["CodePipeline.job"].data.actionConfiguration.configuration.UserParameters;
+
+    var commit = SourceOutput.revision;
 
     // Get the builds.json file.
     var getBuildsFile = function(bucket, branch, callback) {
@@ -85,7 +94,11 @@ exports.handler = function(event, context) {
     getBuildsFile(bucket, branch, function(err, dataObj) {
         if (err && err.code === 'NoSuchKey') {
             var data = {
-                versions:[1],
+                versions:[{
+                    version: 1,
+                    date: new Date(),
+                    commit: commit
+                }],
                 max_version: 1
             };
         } else if (err) {
