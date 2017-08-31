@@ -346,6 +346,37 @@ Resources:
               - '/invocations'
       MethodResponses: []
 
+  ApiGatewayMethodOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      ResourceId:
+        Ref: ApiGatewayResourceProxy
+      RestApiId:
+        Ref: ApiGatewayRestApi
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
   #
   # Create the API Gateway deployment which uses both the GET and POST methods
   #
@@ -575,6 +606,7 @@ Resources:
               Version: 1
             InputArtifacts:
               - Name: BuildOutput
+              - Name: SourceOutput
             Configuration:
               FunctionName: !Ref PackageFunction
               UserParameters: 'master'
@@ -632,6 +664,7 @@ Resources:
               Version: 1
             InputArtifacts:
               - Name: BuildOutput
+              - Name: SourceOutput
             Configuration:
               FunctionName: !Ref PackageFunction
               UserParameters: 'develop'

@@ -19,11 +19,11 @@ Use the command line tools to quickly deploy a new version to either the dev or 
 ## Usage
 Usage: `npm run deployer -- <command>`.  command = [help, stackup, show, deploy]
 
-### stackup
+### create
 Run this command one time to build the stack.
 
 ```
-npm run deployer -- stackup \
+npm run deployer -- create \
 --ProjectName=<project_name> \
 --GitHubOwner=<user_or_organization> \
 --GitHubRepo=<repo> \
@@ -42,6 +42,21 @@ npm run deployer -- stackup \
 **GitHubToken**:  Your github personal access token.
                  https://github.com/settings/tokens, needs "repo" and
                  "admin:repo_hook" checked.
+
+**profile**:      Your AWS credentials profile. [optional]
+
+### update
+Run this command one time to update the stack.
+
+```
+npm run deployer -- update \
+--ProjectName=<project_name> \
+--profile=<aws_profile>
+```
+
+**ProjectName**:  Please enter a name for your project.  This will be the
+                 CloudFormation stack name and used as a prefix for many of the
+                 resources.
 
 **profile**:      Your AWS credentials profile. [optional]
 

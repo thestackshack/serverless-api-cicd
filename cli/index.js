@@ -4,6 +4,7 @@ var _ = require('lodash');
 var async = require('async');
 var fs = require('fs');
 var archiver = require('archiver');
+var moment = require('moment');
 
 var AWS = require('aws-sdk');
 var s3;
@@ -106,7 +107,24 @@ var show = function(branch) {
         getBuildsFile(stackdata.artifactBucket, branch, function(err, dataObj) {
             if (err) throw err;
             var data = JSON.parse(dataObj.Body);
-            console.log(JSON.stringify(data, null, 3));
+            console.log('');
+            if (data.history) {
+                console.log('## History ##');
+                _.forEach(_.take(_.reverse(data.history), 3), function(item) {
+                    console.log('Version '+item.version+' deployed on '+ moment(item.date).format("dddd, MMMM Do YYYY, h:mm:ss a"))
+                });
+                console.log('');
+            }
+            if (data.max_version) {
+                console.log('## Builds ##');
+                console.log('The latest build is '+data.max_version);
+                console.log('');
+            }
+            if (data.current_version) {
+                console.log('## Running ##');
+                console.log('The current running build is '+data.current_version);
+                console.log('');
+            }
         });
     });
 };
@@ -142,7 +160,7 @@ var deploy = function(branch, version) {
     });
 };
 
-var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken) {
+var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken, update) {
     var bucket = ProjectName+'-build-artifacts';
     async.waterfall([
         function(next) {
@@ -181,7 +199,7 @@ var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken) {
             uploadCFTemplate(__dirname + '/../infrastructure/cloudformation.yml', bucket, next);
         },
         function(data, next) {
-            console.log('Creating stack');
+            console.log(update ? 'Updating' : 'Creating' + ' stack');
             var params = {
                 StackName: ProjectName, /* required */
                 Capabilities: [
@@ -223,7 +241,16 @@ var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken) {
                 ],
                 TemplateURL: data
             };
-            cloudformation.createStack(params, next);
+            if (update) {
+                delete params.OnFailure;
+                _.forEach(params.Parameters, function(item) {
+                    delete item.ParameterValue;
+                });
+            }
+            if (update)
+                cloudformation.updateStack(params, next);
+            else
+                cloudformation.createStack(params, next);
         },
         function (data, next) {
             //
@@ -232,7 +259,7 @@ var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken) {
             var params = {
                 StackName: ProjectName
             };
-            cloudformation.waitFor('stackCreateComplete', params, next);
+            cloudformation.waitFor(update ? 'stackUpdateComplete' : 'stackCreateComplete', params, next);
         },
         function (data, next) {
             //
@@ -268,7 +295,7 @@ var stackup = function(ProjectName, GitHubOwner, GitHubRepo, GitHubToken) {
 
 var args = require('yargs')
     .usage('npm run deployer -- <cmd> [args]')
-    .command('stackup [ProjectName] [GitHubOwner] [GitHubRepo] [GitHubToken] [profile]', 'Deploy the stack.', {
+    .command('create [ProjectName] [GitHubOwner] [GitHubRepo] [GitHubToken] [profile]', 'Create the stack.', {
         ProjectName: {
             describe: 'Please enter a name for your project.  This will be the CloudFormation stack name and used as a prefix for many of the resources.',
             required: true
@@ -297,7 +324,26 @@ var args = require('yargs')
         s3 = new AWS.S3();
         cloudformation = new AWS.CloudFormation();
         lambda = new AWS.Lambda();
-        stackup(argv.ProjectName, argv.GitHubOwner, argv.GitHubRepo, argv.GitHubToken);
+        stackup(argv.ProjectName, argv.GitHubOwner, argv.GitHubRepo, argv.GitHubToken, false);
+    })
+    .command('update [ProjectName] [GitHubOwner] [GitHubRepo] [GitHubToken] [profile]', 'Update the stack.', {
+        ProjectName: {
+            describe: 'Please enter a name for your project.  This will be the CloudFormation stack name and used as a prefix for many of the resources.',
+            required: true
+        },
+        profile: {
+            describe: 'Your AWS credentials profile.'
+        }
+    }, function (argv) {
+        if (argv.profile) {
+            console.log('setting AWS profile: '+argv.profile);
+            var credentials = new AWS.SharedIniFileCredentials({profile: argv.profile});
+            AWS.config.credentials = credentials;
+        }
+        s3 = new AWS.S3();
+        cloudformation = new AWS.CloudFormation();
+        lambda = new AWS.Lambda();
+        stackup(argv.ProjectName, argv.GitHubOwner, argv.GitHubRepo, argv.GitHubToken, true);
     })
     .command('deploy [branch] [version] [profile]', 'Deploy a new version of the api.', {
         branch: {
