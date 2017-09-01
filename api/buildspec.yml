@@ -4,19 +4,19 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo Install completed on `date`
   pre_build:
     commands:
       - echo Installing source NPM dependencies...
-      - cd ./api && npm install --production
+      - cd ./api && npm install
   build:
     commands:
-      - echo Build started on `date`
       - echo Testing the code
       - npm test
   post_build:
     commands:
-      - echo Build completed on `date`
+      - echo Removing dev dependencies
+      - rm -Rf node_modules
+      - npm install --production
 artifacts:
   base-directory: 'api'
   files:
