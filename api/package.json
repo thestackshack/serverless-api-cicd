@@ -4,12 +4,9 @@
   "description": "Serverless API CI/CD by The Stack Shack",
   "main": "index.js",
   "dependencies": {
-    "async": "^2.1.4",
-    "aws-sdk": "^2.7.7",
-    "lodash": "^4.17.2",
-    "winston": "^2.3.0"
   },
   "devDependencies": {
+    "aws-sdk": "^2.7.7",
     "mocha": "^3.1.2"
   },
   "scripts": {

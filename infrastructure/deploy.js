@@ -134,11 +134,13 @@ exports.deploy = function(event, context, callback) {
             if (err) return next(err);
             else {
                 var data = JSON.parse(dataObj.Body);
+                console.log(data);
                 var versionObj;
                 for (var i = 0 ; i < data.versions.length ; i++) {
-                    if (data.versions[i] === version)
+                    if (data.versions[i].version === version)
                         versionObj = data.versions[i];
                 }
+                console.log(versionObj);
                 if (!data.history) {
                     data.history = [];
                 }

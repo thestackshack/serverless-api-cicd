@@ -121,7 +121,7 @@ exports.handler = function(event, context) {
             };
         }
 
-        copyBuildArtifact(bucket, key, branch, data.max_version, function(err, results) {
+        copyBuildArtifact(bucket, key, branch, data.max_version.version, function(err, results) {
             if (err) {
                 return putJobFailure(err);
             } else {
@@ -130,7 +130,7 @@ exports.handler = function(event, context) {
                         return putJobFailure(err);
                     } else {
                         // Succeed the job
-                        putJobSuccess("Packaged successfully. version:"+data.max_version);
+                        putJobSuccess("Packaged successfully. version:"+data.max_version.version);
                     }
                 });
             }

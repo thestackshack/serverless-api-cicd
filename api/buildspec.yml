@@ -8,7 +8,7 @@ phases:
   pre_build:
     commands:
       - echo Installing source NPM dependencies...
-      - cd ./api && npm install
+      - cd ./api && npm install --production
   build:
     commands:
       - echo Build started on `date`

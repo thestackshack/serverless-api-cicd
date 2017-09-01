@@ -16,14 +16,22 @@ Use the command line tools to quickly deploy a new version to either the dev or 
 * CloudFormation (Infrastructure as Code)
 * IAM (AWS permissions & users)
 
+## Setup
+```
+npm install
+```
+
 ## Usage
-Usage: `npm run deployer -- <command>`.  command = [help, stackup, show, deploy]
+```
+./cli <command>
+```
+command = [help, stackup, show, deploy]
 
 ### create
 Run this command one time to build the stack.
 
 ```
-npm run deployer -- create \
+./cli create \
 --ProjectName=<project_name> \
 --GitHubOwner=<user_or_organization> \
 --GitHubRepo=<repo> \
@@ -49,7 +57,7 @@ npm run deployer -- create \
 Run this command one time to update the stack.
 
 ```
-npm run deployer -- update \
+./cli update \
 --ProjectName=<project_name> \
 --profile=<aws_profile>
 ```
@@ -64,7 +72,7 @@ npm run deployer -- update \
 Run this command to deploy a new version to either the */prod* or */dev* endpoint.
 
 ```
-npm run deployer -- deploy \
+./cli deploy \
 --branch=<master> \
 --version=<1> \
 --profile=<aws_profile>
@@ -80,7 +88,7 @@ npm run deployer -- deploy \
 Run this command to see what versions have been built and which version is currently running.  The deployment history is also available.
 
 ```
-npm run deployer -- show \
+./cli show \
 --branch=<master> \
 --profile=<aws_profile>
 ```
